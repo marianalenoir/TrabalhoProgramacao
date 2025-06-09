@@ -1,0 +1,252 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <windows.h>
+
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+
+#define MAX_ITENS 50
+#define RESET   "\033[0m"
+#define GREEN   "\033[1;32m"
+#define YELLOW  "\033[1;33m"
+#define BLUE    "\033[1;34m"
+#define RED     "\033[1;31m"
+
+typedef struct {
+    int codigo;
+    char nome[50];
+    float preco;
+} Produto;
+
+typedef struct {
+    Produto produto;
+    int quantidade;
+    float total;
+} Pedido;
+
+void habilitarCoresANSI() {
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0;
+    GetConsoleMode(hOut, &dwMode);
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hOut, dwMode);
+}
+
+Produto cardapio[12] = {
+    {1, "Integral Burger", 12.50},
+    {2, "Teorema do X-Salada", 13.50},
+    {3, "Combo Pitagoras Bacon", 15.00},
+    {4, "Derivada Egg", 14.00},
+    {5, "Misto Quente Log(x)", 9.00},
+    {6, "Hot Dog Hipotenusa", 10.00},
+    {7, "Torrada Trigonometrica", 7.50},
+    {8, "Batata Frita de Fibonacci", 8.50},
+    {9, "Refrigerante da Raiz Quadrada", 5.00},
+    {10, "Suco Vetorial", 6.00},
+    {11, "Agua Mineral do Pi", 3.00},
+    {12, "Cha Gelado Equacao", 4.50}
+};
+
+Pedido pedidos[MAX_ITENS];
+int totalPedidos = 0;
+
+void exibirCardapio() {
+    printf(BLUE "=========== CARDAPIO MATEMATICO ===========" RESET "\n");
+    for (int i = 0; i < 12; i++) {
+        printf(GREEN "[%02d]" RESET " - " YELLOW "%-30s" RESET " R$ %.2f\n",
+               cardapio[i].codigo, cardapio[i].nome, cardapio[i].preco);
+    }
+    printf(BLUE "==========================================\n\n" RESET);
+}
+
+Produto* getProdutoPorCodigo(int codigo) {
+    if (codigo >= 1 && codigo <= 12)
+        return &cardapio[codigo - 1];
+    return NULL;
+}
+
+void emitirNotaFiscal(float valorTotal) {
+    FILE *arquivo = fopen("nota_fiscal.txt", "w");
+    if (arquivo == NULL) {
+        printf(RED "Erro ao gerar nota fiscal!\n" RESET);
+        return;
+    }
+
+    fprintf(arquivo, "========== NOTA FISCAL ==========\n");
+    printf(GREEN "\n========== NOTA FISCAL ==========\n" RESET);
+
+    for (int i = 0; i < totalPedidos; i++) {
+        fprintf(arquivo, "%-30s x%d = R$ %.2f\n", pedidos[i].produto.nome, pedidos[i].quantidade, pedidos[i].total);
+        printf("%-30s x%d = R$ %.2f\n", pedidos[i].produto.nome, pedidos[i].quantidade, pedidos[i].total);
+    }
+
+    fprintf(arquivo, "---------------------------------\nTOTAL A PAGAR: R$ %.2f\n", valorTotal);
+    printf("---------------------------------\nTOTAL A PAGAR: R$ %.2f\n", valorTotal);
+    fprintf(arquivo, "=================================\n");
+    printf(GREEN "Nota fiscal salva em 'nota_fiscal.txt'.\n" RESET);
+
+    fclose(arquivo);
+}
+
+int main() {
+    habilitarCoresANSI();
+
+    int codigo, qtd;
+    float valorTotal = 0.0;
+
+    while (1) {
+        exibirCardapio();
+        printf("Digite o codigo do produto (0 para finalizar): ");
+        if (scanf("%d", &codigo) != 1) {
+            printf(RED "Entrada invalida! Digite um numero inteiro.\n" RESET);
+            while (getchar() != '\n');
+            continue;
+        }
+
+        if (codigo == 0) break;
+
+        Produto* prod = getProdutoPorCodigo(codigo);
+        if (prod == NULL) {
+            printf(RED "Produto nao encontrado. Verifique o codigo.\n" RESET);
+            continue;
+        }
+
+        printf("Digite a quantidade desejada: ");
+        if (scanf("%d", &qtd) != 1 || qtd < 1) {
+            printf(RED "Quantidade invalida! Deve ser um numero inteiro positivo.\n" RESET);
+            while (getchar() != '\n');
+            continue;
+        }
+
+        if (totalPedidos >= MAX_ITENS) {
+            printf(RED "Limite de itens no pedido atingido.\n" RESET);
+            break;
+        }
+
+        pedidos[totalPedidos].produto = *prod;
+        pedidos[totalPedidos].quantidade = qtd;
+        pedidos[totalPedidos].total = prod->preco * qtd;
+        valorTotal += pedidos[totalPedidos].total;
+        totalPedidos++;
+    }
+
+    if (totalPedidos == 0) {
+        printf(RED "Nenhum item foi pedido. Encerrando o sistema.\n" RESET);
+        return 0;
+    }
+
+    int opcao;
+    float desconto = 0.0;
+
+    do {
+        printf(BLUE "\n===== MENU DE AJUSTES =====\n" RESET);
+        printf("1 - Editar quantidade de item\n");
+        printf("2 - Remover item\n");
+        printf("3 - Aplicar desconto (%%)\n");
+        printf("4 - Finalizar e gerar nota fiscal\n");
+        printf("Escolha uma opcao: ");
+        if (scanf("%d", &opcao) != 1) {
+            printf(RED "Entrada invalida!\n" RESET);
+            while (getchar() != '\n');
+            continue;
+        }
+
+        switch (opcao) {
+            case 1: {
+                printf("Digite o codigo do item a editar: ");
+                int codEdit;
+                scanf("%d", &codEdit);
+                int encontrado = 0;
+
+                for (int i = 0; i < totalPedidos; i++) {
+                    if (pedidos[i].produto.codigo == codEdit) {
+                        printf("Quantidade atual: %d\n", pedidos[i].quantidade);
+                        printf("Nova quantidade: ");
+                        int novaQtd;
+                        scanf("%d", &novaQtd);
+                        if (novaQtd < 1) {
+                            printf(RED "Quantidade invalida.\n" RESET);
+                        } else {
+                            valorTotal -= pedidos[i].total;
+                            pedidos[i].quantidade = novaQtd;
+                            pedidos[i].total = pedidos[i].produto.preco * novaQtd;
+                            valorTotal += pedidos[i].total;
+                            printf(GREEN "Quantidade atualizada.\n" RESET);
+                        }
+                        encontrado = 1;
+                        break;
+                    }
+                }
+                if (!encontrado)
+                    printf(RED "Item nao encontrado.\n" RESET);
+                break;
+            }
+            case 2: {
+                printf("Digite o codigo do item a remover: ");
+                int codRem;
+                scanf("%d", &codRem);
+                int encontrado = 0;
+
+                for (int i = 0; i < totalPedidos; i++) {
+                    if (pedidos[i].produto.codigo == codRem) {
+                        valorTotal -= pedidos[i].total;
+                        for (int j = i; j < totalPedidos - 1; j++) {
+                            pedidos[j] = pedidos[j + 1];
+                        }
+                        totalPedidos--;
+                        printf(GREEN "Item removido com sucesso.\n" RESET);
+                        encontrado = 1;
+                        break;
+                    }
+                }
+                if (!encontrado)
+                    printf(RED "Item nao encontrado.\n" RESET);
+                break;
+            }
+            case 3: {
+                printf("Digite a porcentagem de desconto (ex: 10 para 10%%): ");
+                float porc;
+                if (scanf("%f", &porc) != 1 || porc < 0 || porc > 100) {
+                    printf(RED "Desconto invalido.\n" RESET);
+                } else {
+                    desconto = (porc / 100.0f) * valorTotal;
+                    valorTotal -= desconto;
+                    printf(GREEN "Desconto de %.2f%% aplicado. Novo total: R$ %.2f\n" RESET, porc, valorTotal);
+                }
+                break;
+            }
+            case 4:
+                printf(GREEN "Finalizando ajustes...\n" RESET);
+                break;
+            default:
+                printf(RED "Opcao invalida.\n" RESET);
+        }
+    } while (opcao != 4);
+
+    emitirNotaFiscal(valorTotal);
+
+    float pago;
+    while (1) {
+        printf("Digite o valor pago: R$ ");
+        if (scanf("%f", &pago) != 1) {
+            printf(RED "Entrada invalida! Digite um valor numerico.\n" RESET);
+            while (getchar() != '\n');
+            continue;
+        }
+
+        if (pago < valorTotal) {
+            printf(RED "Valor insuficiente. Faltam R$ %.2f\n" RESET, valorTotal - pago);
+        } else {
+            float troco = pago - valorTotal;
+            if (troco > 0) {
+                printf(GREEN "Troco: R$ %.2f\n" RESET, troco);
+            }
+            break;
+        }
+    }
+
+    printf(GREEN "\nPedido concluído. Obrigado pela preferencia!\n>>> ENTREGUE <<<\n" RESET);
+    return 0;
+}
