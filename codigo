@@ -67,7 +67,7 @@ Produto* getProdutoPorCodigo(int codigo) {
     return NULL;
 }
 
-void emitirNotaFiscal(float valorTotal) {
+void emitirNotaFiscal(float valorTotal, const char* metodoPagamento) {
     FILE *arquivo = fopen("nota_fiscal.txt", "w");
     if (arquivo == NULL) {
         printf(RED "Erro ao gerar nota fiscal!\n" RESET);
@@ -84,6 +84,10 @@ void emitirNotaFiscal(float valorTotal) {
 
     fprintf(arquivo, "---------------------------------\nTOTAL A PAGAR: R$ %.2f\n", valorTotal);
     printf("---------------------------------\nTOTAL A PAGAR: R$ %.2f\n", valorTotal);
+
+    fprintf(arquivo, "Forma de pagamento: %s\n", metodoPagamento);
+    printf("Forma de pagamento: %s\n", metodoPagamento);
+
     fprintf(arquivo, "=================================\n");
     printf(GREEN "Nota fiscal salva em 'nota_fiscal.txt'.\n" RESET);
 
@@ -225,7 +229,34 @@ int main() {
         }
     } while (opcao != 4);
 
-    emitirNotaFiscal(valorTotal);
+    int formaPagamento;
+    printf("\nEscolha a forma de pagamento:\n");
+    printf("1 - PIX\n");
+    printf("2 - Cartao\n");
+    printf("3 - Dinheiro\n");
+    printf("Opcao: ");
+    while (scanf("%d", &formaPagamento) != 1 || formaPagamento < 1 || formaPagamento > 3) {
+        printf(RED "Opcao invalida! Tente novamente.\n" RESET);
+        while (getchar() != '\n');
+        printf("Opcao: ");
+    }
+
+    char* metodo;
+    switch (formaPagamento) {
+        case 1:
+            metodo = "PIX";
+            break;
+        case 2:
+            metodo = "Cartao";
+            break;
+        case 3:
+            metodo = "Dinheiro";
+            break;
+    }
+
+    printf(GREEN "\nForma de pagamento selecionada: %s\n" RESET, metodo);
+
+    emitirNotaFiscal(valorTotal, metodo);
 
     float pago;
     while (1) {
